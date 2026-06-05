@@ -1,88 +1,53 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <Wire.h>
-#include <Adafruit_VEML7700.h>
+#include <Arduino.h>
 
-// WiFi
-const char* WIFI_SSID = "WiFi_DGF";
-const char* WIFI_PASSWORD = "D16G01F03!";
+// Implementacion base para Arduino UNO R4:
+// Lee humedad en A0 y activa bomba/relay en D2 mientras la humedad este baja.
 
-// Receptor Python
-const char* SERVER_URL = "http://192.168.5.52:5000/telemetry";
+const int SOIL_ANALOG_PIN = A0;
+const int MOTOR_PIN = 8;
 
-// VEML7700 por I2C (ESP32 por defecto: SDA=21, SCL=22)
-const int I2C_SDA_PIN = 21;
-const int I2C_SCL_PIN = 22;
-Adafruit_VEML7700 veml;
+// Sensor ultrasonico del tanque (HC-SR04)
+const int US_TRIG_PIN = 12;
+const int US_ECHO_PIN = 13;
 
-// Ultrasónico (HC-SR04)
-const int US_TRIG_PIN = 18;
-const int US_ECHO_PIN = 19;
-const float MIN_VALID_CM = 5.0f;
-const float MAX_VALID_CM = 80.0f;
+// LEDs de estado de nivel de agua
+const int LED_GREEN_PIN = 9;
+const int LED_YELLOW_PIN = 10;
+const int LED_RED_PIN = 11;
 
-// Humedad suelo (HW-080 + HW-103)
-// AO -> GPIO34 (solo entrada ADC), DO -> GPIO4
-const int SOIL_ANALOG_PIN = 34;
-const int SOIL_DIGITAL_PIN = 4;
+// Ajusta estos niveles segun tu modulo relay/transistor.
+const int MOTOR_ACTIVE_LEVEL = HIGH;
+const int MOTOR_INACTIVE_LEVEL = LOW;
 
-// Calibracion inicial para ESP32 ADC (0-4095)
-const int AIR_VALUE = 3200;
-const int WATER_VALUE = 1500;
+// Diagnostico rapido: si esta en true, ignora el sensor y alterna el pin del motor.
+const bool MOTOR_PIN_TEST_MODE = false;
+const unsigned long MOTOR_PIN_TEST_INTERVAL_MS = 1000;
 
-const unsigned long SEND_INTERVAL_MS = 1000;
-unsigned long lastSendMs = 0;
+// Calibracion inicial para ADC de 10 bits (0-1023) en UNO R4.
+// AIR_VALUE: lectura con sensor en aire (seco)
+// WATER_VALUE: lectura con sensor en agua (humedo)
+const int AIR_VALUE = 760;
+const int WATER_VALUE = 390;
 
-void connectWiFi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+// Histeresis para evitar encendido/apagado rapido.
+const float MOISTURE_LOW_THRESHOLD = 35.0f;
+const float MOISTURE_HIGH_THRESHOLD = 45.0f;
 
-  Serial.print("Conectando WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  Serial.print("WiFi conectada. IP ESP32: ");
-  Serial.println(WiFi.localIP());
-}
+// Rangos solicitados para nivel de agua medido por distancia.
+const float WATER_FULL_CM = 5.0f;
+const float WATER_LOW_CM = 13.0f;
 
-void setupSensors() {
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  if (!veml.begin()) {
-    Serial.println("No se detecto VEML7700. Revisa cableado I2C.");
-  } else {
-    veml.setGain(VEML7700_GAIN_1);
-    veml.setIntegrationTime(VEML7700_IT_100MS);
-    Serial.println("VEML7700 inicializado.");
-  }
+const unsigned long SAMPLE_INTERVAL_MS = 1000;
+unsigned long lastSampleMs = 0;
+bool motorOn = false;
+unsigned long lastPinTestMs = 0;
 
-  pinMode(US_TRIG_PIN, OUTPUT);
-  pinMode(US_ECHO_PIN, INPUT);
-  digitalWrite(US_TRIG_PIN, LOW);
-
-  pinMode(SOIL_DIGITAL_PIN, INPUT);
-  Serial.println("Ultrasonico y humedad inicializados.");
-}
-
-float readDistanceCm() {
-  digitalWrite(US_TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(US_TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(US_TRIG_PIN, LOW);
-
-  unsigned long duration = pulseIn(US_ECHO_PIN, HIGH, 30000);
-  if (duration == 0) {
-    return -1.0f;
-  }
-
-  float distanceCm = (duration * 0.0343f) / 2.0f;
-  if (distanceCm < MIN_VALID_CM || distanceCm > MAX_VALID_CM) {
-    return -1.0f;
-  }
-  return distanceCm;
-}
+enum WaterLevel {
+  WATER_LEVEL_FULL,
+  WATER_LEVEL_MID,
+  WATER_LEVEL_LOW,
+  WATER_LEVEL_UNKNOWN
+};
 
 int readSoilRaw() {
   long sum = 0;
@@ -109,70 +74,135 @@ float rawToMoisturePct(int raw) {
   return pct;
 }
 
-void sendTelemetry(float lux, float white, float distanceCm, int soilRaw, float moisturePct, int soilDo) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi caida, reconectando...");
-    connectWiFi();
+void setMotor(bool on) {
+  motorOn = on;
+  digitalWrite(MOTOR_PIN, on ? MOTOR_ACTIVE_LEVEL : MOTOR_INACTIVE_LEVEL);
+}
+
+void evaluateIrrigation(float moisturePct) {
+  if (moisturePct < 0.0f) {
+    setMotor(false);
     return;
   }
 
-  HTTPClient http;
-  http.begin(SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
+  if (!motorOn && moisturePct <= MOISTURE_LOW_THRESHOLD) {
+    setMotor(true);
+  } else if (motorOn && moisturePct >= MOISTURE_HIGH_THRESHOLD) {
+    setMotor(false);
+  }
+}
 
-  String payload = "{";
-  payload += "\"device\":\"esp32-multi-sensor\",";
-  payload += "\"lux\":" + String(lux, 2) + ",";
-  payload += "\"white\":" + String(white, 2) + ",";
-  payload += "\"distance_cm\":" + String(distanceCm, 2) + ",";
-  payload += "\"soil_raw_adc\":" + String(soilRaw) + ",";
-  payload += "\"soil_moisture_pct\":" + String(moisturePct, 2) + ",";
-  payload += "\"soil_do\":" + String(soilDo) + ",";
-  payload += "\"uptime_ms\":" + String(millis());
-  payload += "}";
+float readDistanceCm() {
+  digitalWrite(US_TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(US_TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(US_TRIG_PIN, LOW);
 
-  int httpCode = http.POST(payload);
-  Serial.print("POST codigo: ");
-  Serial.println(httpCode);
-  if (httpCode > 0) {
-    Serial.println(http.getString());
-  } else {
-    Serial.print("Error HTTP: ");
-    Serial.println(http.errorToString(httpCode));
+  unsigned long durationUs = pulseIn(US_ECHO_PIN, HIGH, 30000);
+  if (durationUs == 0) {
+    return -1.0f;
   }
 
-  http.end();
+  return (durationUs * 0.0343f) / 2.0f;
+}
+
+WaterLevel classifyWaterLevel(float distanceCm) {
+  if (distanceCm < 0.0f) {
+    return WATER_LEVEL_UNKNOWN;
+  }
+
+  if (distanceCm <= WATER_FULL_CM) {
+    return WATER_LEVEL_FULL;
+  }
+  if (distanceCm >= WATER_LOW_CM) {
+    return WATER_LEVEL_LOW;
+  }
+  return WATER_LEVEL_MID;
+}
+
+void updateLevelLeds(WaterLevel level) {
+  digitalWrite(LED_GREEN_PIN, level == WATER_LEVEL_FULL ? HIGH : LOW);
+  digitalWrite(LED_YELLOW_PIN, level == WATER_LEVEL_MID ? HIGH : LOW);
+  digitalWrite(LED_RED_PIN, level == WATER_LEVEL_LOW ? HIGH : LOW);
+}
+
+const char* levelToText(WaterLevel level) {
+  switch (level) {
+    case WATER_LEVEL_FULL:
+      return "FULL";
+    case WATER_LEVEL_MID:
+      return "MID";
+    case WATER_LEVEL_LOW:
+      return "LOW";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+void runPinTest(unsigned long now) {
+  if (now - lastPinTestMs < MOTOR_PIN_TEST_INTERVAL_MS) {
+    return;
+  }
+  lastPinTestMs = now;
+  setMotor(!motorOn);
+  Serial.print("TEST D8 -> ");
+  Serial.println(motorOn ? "ON" : "OFF");
 }
 
 void setup() {
   Serial.begin(115200);
   delay(1200);
 
-  setupSensors();
-  connectWiFi();
-  Serial.println("Sistema listo: 3 sensores + WiFi");
+  pinMode(MOTOR_PIN, OUTPUT);
+  setMotor(false);
+
+  pinMode(US_TRIG_PIN, OUTPUT);
+  pinMode(US_ECHO_PIN, INPUT);
+  digitalWrite(US_TRIG_PIN, LOW);
+
+  pinMode(LED_GREEN_PIN, OUTPUT);
+  pinMode(LED_YELLOW_PIN, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT);
+  updateLevelLeds(WATER_LEVEL_UNKNOWN);
+
+  Serial.println("Sistema listo: humedad A0 + control motor D8");
+  if (MOTOR_PIN_TEST_MODE) {
+    Serial.println("MODO TEST PIN ACTIVO: D8 alterna ON/OFF cada 1s");
+  }
 }
 
 void loop() {
   unsigned long now = millis();
-  if (now - lastSendMs >= SEND_INTERVAL_MS) {
-    lastSendMs = now;
-
-    float lux = veml.readLux();
-    float white = veml.readWhite();
-    float distanceCm = readDistanceCm();
-    int soilRaw = readSoilRaw();
-    float moisturePct = rawToMoisturePct(soilRaw);
-    int soilDo = digitalRead(SOIL_DIGITAL_PIN);
-
-    Serial.print("Lux=");
-    Serial.print(lux, 1);
-    Serial.print(" | Dist=");
-    Serial.print(distanceCm, 1);
-    Serial.print(" cm | Soil=");
-    Serial.print(moisturePct, 1);
-    Serial.println("%");
-
-    sendTelemetry(lux, white, distanceCm, soilRaw, moisturePct, soilDo);
+  if (MOTOR_PIN_TEST_MODE) {
+    runPinTest(now);
+    return;
   }
+
+  if (now - lastSampleMs < SAMPLE_INTERVAL_MS) {
+    return;
+  }
+  lastSampleMs = now;
+
+  int soilRaw = readSoilRaw();
+  float moisturePct = rawToMoisturePct(soilRaw);
+  evaluateIrrigation(moisturePct);
+
+  float distanceCm = readDistanceCm();
+  WaterLevel level = classifyWaterLevel(distanceCm);
+  updateLevelLeds(level);
+
+  bool isDry = moisturePct >= 0.0f && moisturePct <= MOISTURE_LOW_THRESHOLD;
+  Serial.print("ADC=");
+  Serial.print(soilRaw);
+  Serial.print(" | Humedad=");
+  Serial.print(moisturePct, 1);
+  Serial.print("% | Estado=");
+  Serial.print(isDry ? "SECO" : "HUMEDO");
+  Serial.print(" | Motor=");
+  Serial.print(motorOn ? "ON" : "OFF");
+  Serial.print(" | Distancia=");
+  Serial.print(distanceCm, 1);
+  Serial.print(" cm | NivelAgua=");
+  Serial.println(levelToText(level));
 }
