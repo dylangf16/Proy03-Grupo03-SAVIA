@@ -4,7 +4,7 @@
 // Lee humedad en A0 y activa bomba/relay en D2 mientras la humedad este baja.
 
 const int SOIL_ANALOG_PIN = A0;
-const int MOTOR_PIN = 8;
+const int MOTOR_PIN = 2;
 
 // Sensor ultrasonico del tanque (HC-SR04)
 const int US_TRIG_PIN = 12;
@@ -34,8 +34,12 @@ const float MOISTURE_LOW_THRESHOLD = 35.0f;
 const float MOISTURE_HIGH_THRESHOLD = 45.0f;
 
 // Rangos solicitados para nivel de agua medido por distancia.
-const float WATER_FULL_CM = 5.0f;
-const float WATER_LOW_CM = 13.0f;
+const float WATER_FULL_MAX_CM = 7.0f;
+const float WATER_MID_MAX_CM = 11.0f;
+
+// Filtro ultrasónico: buffer + descarte de outliers.
+const int US_BUFFER_SAMPLES = 7;
+const float US_MAX_VALID_CM = 400.0f;
 
 const unsigned long SAMPLE_INTERVAL_MS = 1000;
 unsigned long lastSampleMs = 0;
@@ -107,15 +111,66 @@ float readDistanceCm() {
   return (durationUs * 0.0343f) / 2.0f;
 }
 
+void sortFloatArray(float* values, int count) {
+  for (int i = 0; i < count - 1; i++) {
+    for (int j = 0; j < count - i - 1; j++) {
+      if (values[j] > values[j + 1]) {
+        float temp = values[j];
+        values[j] = values[j + 1];
+        values[j + 1] = temp;
+      }
+    }
+  }
+}
+
+float readDistanceFilteredCm() {
+  float samples[US_BUFFER_SAMPLES];
+  int validCount = 0;
+
+  for (int i = 0; i < US_BUFFER_SAMPLES; i++) {
+    float d = readDistanceCm();
+    if (d > 0.0f && d <= US_MAX_VALID_CM) {
+      samples[validCount++] = d;
+    }
+    delay(8);
+  }
+
+  if (validCount == 0) {
+    return -1.0f;
+  }
+
+  sortFloatArray(samples, validCount);
+
+  // Si hay suficientes muestras, descarta el menor y el mayor (outliers extremos).
+  int start = 0;
+  int end = validCount;
+  if (validCount >= 5) {
+    start = 1;
+    end = validCount - 1;
+  }
+
+  float sum = 0.0f;
+  int count = 0;
+  for (int i = start; i < end; i++) {
+    sum += samples[i];
+    count++;
+  }
+
+  if (count == 0) {
+    return -1.0f;
+  }
+  return sum / (float)count;
+}
+
 WaterLevel classifyWaterLevel(float distanceCm) {
   if (distanceCm < 0.0f) {
     return WATER_LEVEL_UNKNOWN;
   }
 
-  if (distanceCm <= WATER_FULL_CM) {
+  if (distanceCm <= WATER_FULL_MAX_CM) {
     return WATER_LEVEL_FULL;
   }
-  if (distanceCm >= WATER_LOW_CM) {
+  if (distanceCm >= WATER_MID_MAX_CM) {
     return WATER_LEVEL_LOW;
   }
   return WATER_LEVEL_MID;
@@ -134,7 +189,7 @@ const char* levelToText(WaterLevel level) {
     case WATER_LEVEL_MID:
       return "MID";
     case WATER_LEVEL_LOW:
-      return "LOW";
+      return "EMPTY";
     default:
       return "UNKNOWN";
   }
@@ -188,7 +243,7 @@ void loop() {
   float moisturePct = rawToMoisturePct(soilRaw);
   evaluateIrrigation(moisturePct);
 
-  float distanceCm = readDistanceCm();
+  float distanceCm = readDistanceFilteredCm();
   WaterLevel level = classifyWaterLevel(distanceCm);
   updateLevelLeds(level);
 
