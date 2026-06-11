@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SAVIA · Mi maceta</title>
+<style>
+  :root {
+    --green: #2f7d52;
+    --green-dark: #245f3f;
+    --green-pill: #2e8b57;
+    --red: #e0473d;
+    --red-dark: #c93a31;
+    --bg: #9c9c9c;
+    --card: #f4f3f1;
+    --card-inner: #e9e7e3;
+    --ink: #1d1d1d;
+    --muted: #8a8a8a;
+    --orange: #e8923a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 18px;
+  }
+
+  .app { width: 100%; max-width: 980px; }
+
+  /* ---------- Top navigation ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 18px;
+    padding: 0 6px;
+  }
+
+  .logo {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #5fb87f, var(--green));
+    flex-shrink: 0;
+  }
+
+  .nav-tabs { display: flex; align-items: center; gap: 10px; }
+
+  .tab {
+    font-size: 13px;
+    color: #4a4a4a;
+    padding: 7px 16px;
+    border-radius: 18px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+  }
+
+  .tab.active {
+    background: var(--green-pill);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(46, 139, 87, .35);
+  }
+
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    display: grid; place-items: center;
+    cursor: pointer; position: relative;
+  }
+
+  .icon-btn .dot {
+    position: absolute; top: 5px; right: 6px;
+    width: 7px; height: 7px;
+    border-radius: 50%; background: var(--red);
+  }
+
+  .profile-btn {
+    border: 1px solid #cfcfcf; background: #fff;
+    border-radius: 20px; padding: 8px 18px;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+
+  /* ---------- Main card ---------- */
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 34px 38px 30px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .18);
+  }
+
+  .title-row { display: flex; align-items: center; gap: 10px; }
+
+  h1.title { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+
+  .edit-icon { color: var(--muted); font-size: 15px; cursor: pointer; }
+
+  .subtitle {
+    color: #6f6f6f; font-size: 15px; margin-top: 2px;
+    display: flex; align-items: center; gap: 7px;
+  }
+
+  /* connection badge */
+  .conn {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 600; color: #5a5a5a;
+    background: #fff; border: 1px solid #dcdad6;
+    padding: 6px 12px; border-radius: 20px;
+  }
+  .conn .led {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #bbb; transition: background .3s;
+  }
+  .conn.online  .led { background: #38b25f; box-shadow: 0 0 0 3px rgba(56,178,95,.2); }
+  .conn.offline .led { background: var(--red); box-shadow: 0 0 0 3px rgba(224,71,61,.2); }
+
+  /* ---------- Render area ---------- */
+  .render {
+    margin: 18px 0 26px;
+    height: 230px;
+    border-radius: 14px;
+    background-image:
+      linear-gradient(rgba(0,0,0,.10), rgba(0,0,0,.28)),
+      url("/imagen_cactus_bonito.jpeg");
+    background-size: cover;
+    background-position: center 38%;
+    display: grid; place-items: center;
+    position: relative; overflow: hidden;
+  }
+
+  .render span {
+    font-size: 46px; font-weight: 600; letter-spacing: 4px;
+    color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.55);
+  }
+
+  /* ---------- Stats + actions row ---------- */
+  .panel {
+    display: grid;
+    grid-template-columns: 1fr 250px;
+    gap: 26px; align-items: start;
+  }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  .stat {
+    background: var(--card-inner);
+    border-radius: 16px;
+    padding: 16px 16px 18px;
+    text-align: center;
+  }
+
+  .stat .label { font-size: 13px; color: #6c6c6c; margin-bottom: 6px; }
+  .stat .glyph { font-size: 26px; line-height: 1; margin-bottom: 6px; }
+  .stat .value { font-size: 26px; font-weight: 800; margin-bottom: 12px; }
+  .stat .value small { font-size: 13px; font-weight: 600; }
+
+  .bar { height: 6px; border-radius: 4px; background: #d3d0cb; overflow: hidden; }
+  .bar > i {
+    display: block; height: 100%; border-radius: 4px;
+    width: 0%; transition: width .5s ease, background .3s;
+  }
+  .c-red    { background: var(--red); }
+  .c-green  { background: var(--green); }
+  .c-orange { background: var(--orange); }
+
+  /* action buttons */
+  .actions { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+
+  .btn {
+    border: none; border-radius: 12px;
+    padding: 15px 16px; font-size: 15px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+
+  .btn-primary {
+    background: var(--red); color: #fff;
+    box-shadow: 0 6px 16px rgba(224, 71, 61, .35);
+  }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-primary:disabled { opacity: .55; cursor: default; box-shadow: none; }
+
+  .btn-outline {
+    background: #fff; border: 1px solid #d2d0cc;
+    color: #2a2a2a; font-weight: 500;
+  }
+  .btn-outline:hover { background: #faf9f7; }
+
+  /* ---------- Estado actual ---------- */
+  .estado {
+    margin-top: 26px;
+    border-top: 1px solid #dedbd6;
+    padding-top: 20px;
+  }
+
+  .estado h2 { font-size: 21px; font-weight: 800; margin-bottom: 6px; }
+
+  .estado .alert {
+    font-weight: 600; font-size: 15px; margin-bottom: 10px; color: var(--red);
+  }
+  .estado .alert.ok      { color: var(--green-dark); }
+  .estado .alert.info    { color: #5a5a5a; }
+  .estado .alert.warning { color: var(--red); }
+
+  .estado p { color: #555; font-size: 14px; line-height: 1.55; max-width: 620px; }
+
+  .estado .timer { margin-top: 14px; font-size: 14px; color: #3a3a3a; }
+  .estado .timer b { color: var(--green-dark); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #222; color: #fff; padding: 12px 22px; border-radius: 24px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: all .3s;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Modal umbrales ---------- */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; place-items: center; z-index: 50;
+  }
+  .modal-back.open { display: grid; }
+  .modal {
+    background: #fff; border-radius: 18px; padding: 26px 28px;
+    width: 360px; max-width: calc(100vw - 32px);
+    box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  }
+  .modal h3 { font-size: 19px; font-weight: 800; margin-bottom: 4px; }
+  .modal .sub { font-size: 13px; color: #777; margin-bottom: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; }
+  .field input {
+    width: 100%; padding: 10px 12px; border: 1px solid #d4d2ce;
+    border-radius: 10px; font-size: 14px; font-family: inherit;
+  }
+  .field.row { display: flex; gap: 12px; }
+  .field.row > div { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .modal-actions .btn { flex: 1; padding: 12px; }
+</style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- Top navigation -->
+    <nav class="topbar">
+      <div class="logo"></div>
+      <div class="nav-tabs">
+        <button class="tab">Inicio</button>
+        <button class="tab active">Tus macetas</button>
+        <button class="tab">Blog</button>
+      </div>
+      <div class="nav-right">
+        <button class="icon-btn" aria-label="Favoritos">
+          <span class="dot"></span>♡
+        </button>
+        <button class="profile-btn">Tu perfil</button>
+      </div>
+    </nav>
+
+    <!-- Main card -->
+    <section class="card">
+      <div class="title-row">
+        <h1 class="title">mi savia</h1>
+        <span class="edit-icon">✎</span>
+        <div id="conn" class="conn offline">
+          <span class="led"></span><span id="connText">Sin conexión</span>
+        </div>
+      </div>
+      <div class="subtitle">Pothos · maceta #1 <span class="edit-icon">✎</span></div>
+
+      <!-- Render placeholder with cactus background -->
+      <div class="render">
+        <span>RENDER AQUI</span>
+      </div>
+
+      <!-- Stats + actions -->
+      <div class="panel">
+        <div class="stats">
+          <div class="stat">
+            <div class="label">humedad</div>
+            <div class="glyph">💧</div>
+            <div class="value"><span id="humVal">--</span>%</div>
+            <div class="bar"><i id="humBar" class="c-red"></i></div>
+          </div>
+          <div class="stat">
+            <div class="label">luz</div>
+            <div class="glyph">☀️</div>
+            <div class="value"><span id="luxVal">--</span><small> lux</small></div>
+            <div class="bar"><i id="luxBar" class="c-green"></i></div>
+          </div>
+          <div class="stat">
+            <div class="label">tanque</div>
+            <div class="glyph">🪣</div>
+            <div class="value"><span id="tankVal">--</span>%</div>
+            <div class="bar"><i id="tankBar" class="c-orange"></i></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnRegar" class="btn btn-primary">Regar planta ahora</button>
+          <button id="btnUmbrales" class="btn btn-outline">Ajustar umbrales</button>
+        </div>
+      </div>
+
+      <!-- Estado actual -->
+      <div class="estado">
+        <h2>Estado actual:</h2>
+        <div id="estadoAlert" class="alert info">Conectando…</div>
+        <p id="estadoMsg">Esperando datos del dispositivo.</p>
+        <div class="timer">
+          Riego automático cada: <b id="riegoTimer">--:--:--</b>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Modal: Ajustar umbrales -->
+  <div id="modalBack" class="modal-back">
+    <div class="modal">
+      <h3>Ajustar umbrales</h3>
+      <div class="sub">Configura los rangos para tu maceta.</div>
+      <div class="field row">
+        <div>
+          <label>Humedad mín (%)</label>
+          <input id="inHumMin" type="number" step="1" />
+        </div>
+        <div>
+          <label>Humedad máx (%)</label>
+          <input id="inHumMax" type="number" step="1" />
+        </div>
+      </div>
+      <div class="field row">
+        <div>
+          <label>Luz mín (lux)</label>
+          <input id="inLuxMin" type="number" step="10" />
+        </div>
+        <div>
+          <label>Luz máx (lux)</label>
+          <input id="inLuxMax" type="number" step="10" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn btn-outline">Cancelar</button>
+        <button id="modalSave" class="btn btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function setBar(barEl, pct, color) {
+    barEl.style.width = (pct ?? 0) + "%";
+    barEl.className = "c-" + color;
+  }
+
+  function fmtTimer(totalSeconds) {
+    if (totalSeconds == null) return "--:--:--";
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+    return `${h}hrs / ${m}min / ${s} segundos`;
+  }
+
+  let countdown = null;
+
+  function render(state) {
+    // Conexión
+    const conn = $("conn");
+    conn.className = "conn " + (state.connected ? "online" : "offline");
+    $("connText").textContent = state.connected
+      ? "En línea" + (state.updated_at ? " · " + state.updated_at : "")
+      : "Sin conexión";
+
+    // Métricas
+    $("humVal").textContent  = state.humedad.value ?? "--";
+    setBar($("humBar"), state.humedad.bar, state.humedad.color);
+
+    $("luxVal").textContent  = state.luz.value ?? "--";
+    setBar($("luxBar"), state.luz.bar, state.luz.color);
+
+    $("tankVal").textContent = state.tanque.value ?? "--";
+    setBar($("tankBar"), state.tanque.bar, state.tanque.color);
+
+    // Estado actual
+    $("estadoAlert").textContent = state.estado.alert;
+    $("estadoAlert").className = "alert " + state.estado.severity;
+    $("estadoMsg").textContent = state.estado.message;
+
+    // Botón regar: solo si necesita / tiene sentido
+    $("btnRegar").disabled = !state.connected;
+
+    // Contador
+    countdown = state.auto_irrigation_remaining_s;
+    $("riegoTimer").textContent = fmtTimer(countdown);
+
+    // Pre-cargar umbrales en el modal
+    if (state.thresholds) {
+      $("inHumMin").value = state.thresholds.humedad_min;
+      $("inHumMax").value = state.thresholds.humedad_max;
+      $("inLuxMin").value = state.thresholds.luz_min;
+      $("inLuxMax").value = state.thresholds.luz_max;
+    }
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch("/api/state", { cache: "no-store" });
+      render(await r.json());
+    } catch (e) {
+      $("conn").className = "conn offline";
+      $("connText").textContent = "Servidor no disponible";
+    }
+  }
+
+  // Contador local que decrementa cada segundo entre polls
+  setInterval(() => {
+    if (countdown != null && countdown > 0) {
+      countdown -= 1;
+      $("riegoTimer").textContent = fmtTimer(countdown);
+    }
+  }, 1000);
+
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  // Regar ahora
+  $("btnRegar").addEventListener("click", async () => {
+    try {
+      await fetch("/api/irrigate", { method: "POST" });
+      toast("💧 Riego solicitado");
+      poll();
+    } catch { toast("No se pudo enviar la orden"); }
+  });
+
+  // Modal umbrales
+  $("btnUmbrales").addEventListener("click", () => $("modalBack").classList.add("open"));
+  $("modalCancel").addEventListener("click", () => $("modalBack").classList.remove("open"));
+  $("modalBack").addEventListener("click", (e) => {
+    if (e.target === $("modalBack")) $("modalBack").classList.remove("open");
+  });
+  $("modalSave").addEventListener("click", async () => {
+    const body = {
+      humedad_min: parseFloat($("inHumMin").value),
+      humedad_max: parseFloat($("inHumMax").value),
+      luz_min: parseFloat($("inLuxMin").value),
+      luz_max: parseFloat($("inLuxMax").value),
+    };
+    try {
+      await fetch("/api/thresholds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      $("modalBack").classList.remove("open");
+      toast("✅ Umbrales actualizados");
+      poll();
+    } catch { toast("No se pudieron guardar los umbrales"); }
+  });
+
+  // Arranque
+  poll();
+  setInterval(poll, 2000);
+</script>
+</body>
+</html>
