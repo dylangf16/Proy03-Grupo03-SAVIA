@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include "Adafruit_VEML7700.h"
 
 // Implementacion base para Arduino UNO R4:
 // Lee humedad en A0 y activa bomba/relay en D2 mientras la humedad este baja.
@@ -7,8 +9,12 @@ const int SOIL_ANALOG_PIN = A0;
 const int MOTOR_PIN = 2;
 
 // Sensor ultrasonico del tanque (HC-SR04)
-const int US_TRIG_PIN = 12;
-const int US_ECHO_PIN = 13;
+const int US_TRIG_PIN = 5;
+const int US_ECHO_PIN = 6;
+
+// Sensor de luz ambiental Adafruit VEML7700 (I2C: SDA/SCL).
+Adafruit_VEML7700 veml = Adafruit_VEML7700();
+bool vemlReady = false;
 
 // LEDs de estado de nivel de agua
 const int LED_GREEN_PIN = 9;
@@ -221,6 +227,16 @@ void setup() {
   pinMode(LED_RED_PIN, OUTPUT);
   updateLevelLeds(WATER_LEVEL_UNKNOWN);
 
+  // Inicializa el sensor de luz VEML7700 por I2C (SDA/SCL).
+  if (veml.begin()) {
+    vemlReady = true;
+    veml.setGain(VEML7700_GAIN_1);
+    veml.setIntegrationTime(VEML7700_IT_100MS);
+    Serial.println("VEML7700 detectado en I2C");
+  } else {
+    Serial.println("VEML7700 NO detectado (revisa cableado SDA/SCL)");
+  }
+
   Serial.println("Sistema listo: humedad A0 + control motor D8");
   if (MOTOR_PIN_TEST_MODE) {
     Serial.println("MODO TEST PIN ACTIVO: D8 alterna ON/OFF cada 1s");
@@ -247,6 +263,8 @@ void loop() {
   WaterLevel level = classifyWaterLevel(distanceCm);
   updateLevelLeds(level);
 
+  float lux = vemlReady ? veml.readLux() : -1.0f;
+
   bool isDry = moisturePct >= 0.0f && moisturePct <= MOISTURE_LOW_THRESHOLD;
   Serial.print("ADC=");
   Serial.print(soilRaw);
@@ -259,5 +277,12 @@ void loop() {
   Serial.print(" | Distancia=");
   Serial.print(distanceCm, 1);
   Serial.print(" cm | NivelAgua=");
-  Serial.println(levelToText(level));
+  Serial.print(levelToText(level));
+  Serial.print(" | Luz=");
+  if (lux >= 0.0f) {
+    Serial.print(lux, 1);
+    Serial.println(" lux");
+  } else {
+    Serial.println("N/D");
+  }
 }
