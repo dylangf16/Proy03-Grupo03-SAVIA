@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import socket
 import threading
 import time
 from datetime import datetime
@@ -35,10 +36,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 HTML_FILE = REPO_ROOT / "interfaz_web/avance 1/mimaceta.html"
 IMAGE_FILE = REPO_ROOT / "interfaz_web/imagen_cactus_bonito.jpeg"
 
-# Mapeo de distancia (cm) -> porcentaje de tanque.
-TANK_FULL_CM = 7.0      # <= 7 cm  => 100 %
-TANK_EMPTY_CM = 16.0    # >= 16 cm =>   0 %
-TANK_MID_MAX_CM = 11.0  # clasificacion EMPTY del firmware
+# Mapeo de distancia (cm) -> porcentaje de tanque (limites de calibracion).
+TANK_PCT_FULL_CM = 4.0    # <= 4 cm  => 100 %
+TANK_PCT_EMPTY_CM = 14.0  # >= 14 cm =>   0 %
+
+# Clasificacion discreta FULL / MID / EMPTY (coincide con el firmware).
+WATER_FULL_MAX_CM = 5.0    # <= 5 cm  => FULL
+WATER_EMPTY_MIN_CM = 13.0  # >= 13 cm => EMPTY
 
 # Referencia para la barra de luz (1000 lux ~ barra llena).
 LUX_FULL_REF = 1000.0
@@ -120,12 +124,13 @@ class SaviaState:
             tank_level = "UNKNOWN"
         else:
             tank_pct = _clamp(
-                (TANK_EMPTY_CM - distance) / (TANK_EMPTY_CM - TANK_FULL_CM) * 100,
+                (TANK_PCT_EMPTY_CM - distance)
+                / (TANK_PCT_EMPTY_CM - TANK_PCT_FULL_CM) * 100,
                 0, 100,
             )
-            if distance <= TANK_FULL_CM:
+            if distance <= WATER_FULL_MAX_CM:
                 tank_level = "FULL"
-            elif distance >= TANK_MID_MAX_CM:
+            elif distance >= WATER_EMPTY_MIN_CM:
                 tank_level = "EMPTY"
             else:
                 tank_level = "MID"
@@ -306,6 +311,23 @@ def _now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _local_ip() -> str:
+    """IP local de la PC en la red (la que debe ir en SERVER_HOST del Arduino).
+
+    Abre un socket UDP "hacia afuera" (sin enviar nada) solo para que el SO
+    revele que interfaz/IP usaria para salir; es el metodo mas fiable cuando
+    hay varias interfaces. Cae a 127.0.0.1 si no hay red.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 # --------------------------------------------------------------------------- #
 # main
 # --------------------------------------------------------------------------- #
@@ -316,10 +338,14 @@ def main():
     args = parser.parse_args()
 
     server = ThreadingHTTPServer((HOST, args.port), SaviaHandler)
+    ip = _local_ip()
     print("=" * 56)
     print("  SAVIA · mi maceta")
     print(f"  Interfaz   ->  http://localhost:{args.port}/")
-    print(f"  Telemetria ->  POST http://<ip-del-pc>:{args.port}/telemetry")
+    print(f"  Telemetria ->  POST http://{ip}:{args.port}/telemetry")
+    print()
+    print("  >> IP para el Arduino (SERVER_HOST en el sketch):")
+    print(f"        {ip}")
     print("  Ctrl+C para salir")
     print("=" * 56)
     try:
