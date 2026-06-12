@@ -1,9 +1,27 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <WiFiS3.h>
 #include "Adafruit_VEML7700.h"
 
-// Implementacion base para Arduino UNO R4:
+// Implementacion base para Arduino UNO R4 WiFi:
 // Lee humedad en A0 y activa bomba/relay en D2 mientras la humedad este baja.
+// Ademas se conecta por WiFi y envia la telemetria de los sensores y el estado
+// del motor por HTTP POST al servidor (telemetry_receiver.py).
+
+// ---- Configuracion WiFi y servidor de telemetria ----
+const char* WIFI_SSID = "DGF";
+const char* WIFI_PASSWORD = "123456789";
+
+// IP/host y puerto donde corre telemetry_receiver.py (HOST=0.0.0.0 PORT=5000).
+// Usa la IP local de la PC que ejecuta el servidor, por ejemplo "192.168.1.50".
+const char* SERVER_HOST = "10.177.158.85";
+const uint16_t SERVER_PORT = 5000;
+const char* SERVER_PATH = "/telemetry";
+const char* DEVICE_NAME = "savia-uno-r4";
+
+// Cada cuantos ms se reintenta conectar si se cae el WiFi.
+const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
+unsigned long lastWifiRetryMs = 0;
 
 const int SOIL_ANALOG_PIN = A0;
 const int MOTOR_PIN = 2;
@@ -32,16 +50,19 @@ const unsigned long MOTOR_PIN_TEST_INTERVAL_MS = 1000;
 // Calibracion inicial para ADC de 10 bits (0-1023) en UNO R4.
 // AIR_VALUE: lectura con sensor en aire (seco)
 // WATER_VALUE: lectura con sensor en agua (humedo)
-const int AIR_VALUE = 760;
-const int WATER_VALUE = 390;
+const int AIR_VALUE = 1000;
+const int WATER_VALUE = 900;
 
 // Histeresis para evitar encendido/apagado rapido.
 const float MOISTURE_LOW_THRESHOLD = 35.0f;
 const float MOISTURE_HIGH_THRESHOLD = 45.0f;
 
 // Rangos solicitados para nivel de agua medido por distancia.
-const float WATER_FULL_MAX_CM = 7.0f;
-const float WATER_MID_MAX_CM = 11.0f;
+// FULL  : distancia <= 5 cm  (agua cerca del sensor, tanque lleno)
+// EMPTY : distancia >= 13 cm (agua lejos, tanque vacio)
+// MID   : entre 5 y 13 cm
+const float WATER_FULL_MAX_CM = 5.0f;
+const float WATER_MID_MAX_CM = 13.0f;
 
 // Filtro ultrasónico: buffer + descarte de outliers.
 const int US_BUFFER_SAMPLES = 7;
@@ -201,6 +222,110 @@ const char* levelToText(WaterLevel level) {
   }
 }
 
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  if (WiFi.status() == WL_NO_MODULE) {
+    Serial.println("Modulo WiFi no detectado");
+    return;
+  }
+
+  Serial.print("Conectando a WiFi: ");
+  Serial.println(WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  // Espera hasta ~12s a que conecte Y que DHCP asigne una IP valida.
+  // En el UNO R4 (WiFiS3) el estado pasa a WL_CONNECTED antes de tener IP,
+  // por eso tambien esperamos a que localIP() deje de ser 0.0.0.0.
+  unsigned long start = millis();
+  while (millis() - start < 12000) {
+    if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0)) {
+      break;
+    }
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  IPAddress ip = WiFi.localIP();
+  if (WiFi.status() == WL_CONNECTED && ip != IPAddress(0, 0, 0, 0)) {
+    Serial.print("WiFi conectado. IP: ");
+    Serial.println(ip);
+  } else {
+    Serial.println("No se pudo conectar / sin IP (se reintentara)");
+    // Fuerza un nuevo intento limpio en la proxima llamada.
+    WiFi.disconnect();
+  }
+}
+
+void sendTelemetry(int soilRaw, float moisturePct, bool dry, bool motor,
+                   float distanceCm, WaterLevel level, float lux) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  // Construye el cuerpo JSON con los campos que espera telemetry_receiver.py.
+  String body = "{";
+  body += "\"device\":\"";
+  body += DEVICE_NAME;
+  body += "\",";
+  body += "\"soil_raw_adc\":";
+  body += String(soilRaw);
+  body += ",";
+  body += "\"soil_moisture_pct\":";
+  body += (moisturePct >= 0.0f) ? String(moisturePct, 1) : String("null");
+  body += ",";
+  body += "\"soil_dry\":";
+  body += dry ? "true" : "false";
+  body += ",";
+  body += "\"motor_on\":";
+  body += motor ? "true" : "false";
+  body += ",";
+  body += "\"distance_cm\":";
+  body += (distanceCm >= 0.0f) ? String(distanceCm, 1) : String("null");
+  body += ",";
+  body += "\"water_level\":\"";
+  body += levelToText(level);
+  body += "\",";
+  body += "\"lux\":";
+  body += (lux >= 0.0f) ? String(lux, 1) : String("null");
+  body += ",";
+  body += "\"uptime_ms\":";
+  body += String(millis());
+  body += "}";
+
+  WiFiClient client;
+  if (!client.connect(SERVER_HOST, SERVER_PORT)) {
+    Serial.println("No se pudo conectar al servidor de telemetria");
+    return;
+  }
+
+  client.print("POST ");
+  client.print(SERVER_PATH);
+  client.println(" HTTP/1.1");
+  client.print("Host: ");
+  client.print(SERVER_HOST);
+  client.print(":");
+  client.println(SERVER_PORT);
+  client.println("Content-Type: application/json");
+  client.print("Content-Length: ");
+  client.println(body.length());
+  client.println("Connection: close");
+  client.println();
+  client.print(body);
+
+  // Espera breve la respuesta y cierra para liberar el socket.
+  unsigned long start = millis();
+  while (client.connected() && millis() - start < 2000) {
+    while (client.available()) {
+      client.read();
+    }
+  }
+  client.stop();
+}
+
 void runPinTest(unsigned long now) {
   if (now - lastPinTestMs < MOTOR_PIN_TEST_INTERVAL_MS) {
     return;
@@ -237,6 +362,8 @@ void setup() {
     Serial.println("VEML7700 NO detectado (revisa cableado SDA/SCL)");
   }
 
+  connectWiFi();
+
   Serial.println("Sistema listo: humedad A0 + control motor D8");
   if (MOTOR_PIN_TEST_MODE) {
     Serial.println("MODO TEST PIN ACTIVO: D8 alterna ON/OFF cada 1s");
@@ -248,6 +375,12 @@ void loop() {
   if (MOTOR_PIN_TEST_MODE) {
     runPinTest(now);
     return;
+  }
+
+  // Reintenta WiFi periodicamente sin bloquear el muestreo.
+  if (WiFi.status() != WL_CONNECTED && now - lastWifiRetryMs >= WIFI_RETRY_INTERVAL_MS) {
+    lastWifiRetryMs = now;
+    connectWiFi();
   }
 
   if (now - lastSampleMs < SAMPLE_INTERVAL_MS) {
@@ -285,4 +418,7 @@ void loop() {
   } else {
     Serial.println("N/D");
   }
+
+  // Envia la telemetria de sensores + estado del motor al servidor por WiFi.
+  sendTelemetry(soilRaw, moisturePct, isDry, motorOn, distanceCm, level, lux);
 }
