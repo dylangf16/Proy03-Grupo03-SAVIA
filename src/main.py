@@ -33,7 +33,7 @@ DEFAULT_PORT = 5000
 
 # main.py vive en src/, los assets web estan en la raiz del repositorio.
 REPO_ROOT = Path(__file__).resolve().parent.parent
-HTML_FILE = REPO_ROOT / "interfaz_web/avance 1/mimaceta.html"
+HTML_FILE = REPO_ROOT / "interfaz_web/mimaceta.html"
 IMAGE_FILE = REPO_ROOT / "interfaz_web/imagen_cactus_bonito.jpeg"
 
 # Mapeo de distancia (cm) -> porcentaje de tanque (limites de calibracion).
