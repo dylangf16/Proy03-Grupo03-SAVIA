@@ -107,16 +107,25 @@ class SaviaState:
         # --- Humedad ---
         hum_pct = soil
         hum_bar = _clamp(hum_pct if hum_pct is not None else 0, 0, 100)
-        hum_color = "green" if (hum_pct is not None and hum_pct >= self.humedad_min) else "red"
+        if hum_pct is None:
+            hum_color, hum_status = "red", "Sin datos"
+        elif hum_pct < self.humedad_min:
+            hum_color, hum_status = "red", "Bajo el umbral"
+        elif hum_pct > self.humedad_max:
+            hum_color, hum_status = "orange", "Sobre el umbral"
+        else:
+            hum_color, hum_status = "green", "Adecuada"
 
         # --- Luz ---
         lux_bar = _clamp((lux / LUX_FULL_REF) * 100 if lux is not None else 0, 0, 100)
         if lux is None:
-            lux_color = "red"
-        elif lux < self.luz_min or lux > self.luz_max:
-            lux_color = "orange"
+            lux_color, lux_status = "red", "Sin datos"
+        elif lux < self.luz_min:
+            lux_color, lux_status = "orange", "Poca luz"
+        elif lux > self.luz_max:
+            lux_color, lux_status = "orange", "Exceso de luz"
         else:
-            lux_color = "green"
+            lux_color, lux_status = "green", "Adecuada"
 
         # --- Tanque (a partir de la distancia) ---
         if distance is None or distance < 0:
@@ -135,6 +144,9 @@ class SaviaState:
             else:
                 tank_level = "MID"
         tank_color = {"FULL": "green", "MID": "orange", "EMPTY": "red"}.get(tank_level, "red")
+        tank_status = {
+            "FULL": "Lleno", "MID": "Rellenar pronto", "EMPTY": "Vacío",
+        }.get(tank_level, "Sin datos")
 
         # --- Estado actual (refleja Controller.evaluate_*) ---
         alert, message, severity = self._evaluate(hum_pct, lux, tank_level)
@@ -148,14 +160,16 @@ class SaviaState:
             "connected": connected,
             "device": payload.get("device", "—"),
             "humedad": {
-                "value": _round(hum_pct), "bar": round(hum_bar), "color": hum_color,
+                "value": _round(hum_pct), "bar": round(hum_bar),
+                "color": hum_color, "status": hum_status,
             },
             "luz": {
-                "value": _round(lux), "bar": round(lux_bar), "color": lux_color,
+                "value": _round(lux), "bar": round(lux_bar),
+                "color": lux_color, "status": lux_status,
             },
             "tanque": {
                 "value": _round(tank_pct), "bar": round(tank_pct or 0),
-                "color": tank_color, "level": tank_level,
+                "color": tank_color, "level": tank_level, "status": tank_status,
             },
             "estado": {"alert": alert, "message": message, "severity": severity},
             "thresholds": {

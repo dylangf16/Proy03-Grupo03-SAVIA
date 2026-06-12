@@ -126,13 +126,13 @@
   .conn.online  .led { background: #38b25f; box-shadow: 0 0 0 3px rgba(56,178,95,.2); }
   .conn.offline .led { background: var(--red); box-shadow: 0 0 0 3px rgba(224,71,61,.2); }
 
-  /* ---------- Render area ---------- */
+  /* ---------- Render con stats superpuestas ---------- */
   .render {
-    margin: 18px 0 26px;
-    height: 230px;
+    margin: 18px 0 16px;
+    height: 380px;
     border-radius: 14px;
     background-image:
-      linear-gradient(rgba(0,0,0,.10), rgba(0,0,0,.28)),
+      linear-gradient(rgba(0,0,0,.05), rgba(0,0,0,.22)),
       url("/imagen_cactus_bonito.jpeg");
     background-size: cover;
     background-position: center 38%;
@@ -140,33 +140,45 @@
     position: relative; overflow: hidden;
   }
 
-  .render span {
-    font-size: 46px; font-weight: 600; letter-spacing: 4px;
-    color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.55);
+  .render > span {
+    font-size: 40px; font-weight: 600; letter-spacing: 4px;
+    color: rgba(255, 255, 255, .92); text-shadow: 0 2px 14px rgba(0,0,0,.55);
   }
 
-  /* ---------- Stats + actions row ---------- */
-  .panel {
-    display: grid;
-    grid-template-columns: 1fr 250px;
-    gap: 26px; align-items: start;
+  /* Stats apiladas a la derecha, dentro del render */
+  .stats {
+    position: absolute;
+    top: 14px; right: 14px; bottom: 14px;
+    width: 190px;
+    display: flex; flex-direction: column; gap: 10px;
   }
-
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 
   .stat {
-    background: var(--card-inner);
-    border-radius: 16px;
-    padding: 16px 16px 18px;
-    text-align: center;
+    background: rgba(40, 42, 40, .5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 13px;
+    padding: 11px 13px 12px;
+    text-align: left;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .14);
   }
 
-  .stat .label { font-size: 13px; color: #6c6c6c; margin-bottom: 6px; }
-  .stat .glyph { font-size: 26px; line-height: 1; margin-bottom: 6px; }
-  .stat .value { font-size: 26px; font-weight: 800; margin-bottom: 12px; }
-  .stat .value small { font-size: 13px; font-weight: 600; }
+  .stat .label { font-size: 12px; color: rgba(255, 255, 255, .85); margin-bottom: 4px; }
+  .stat .value { font-size: 27px; font-weight: 800; margin-bottom: 9px; line-height: 1; color: #fff; }
+  .stat .value small { font-size: 12px; font-weight: 600; }
 
-  .bar { height: 6px; border-radius: 4px; background: #d3d0cb; overflow: hidden; }
+  .stat .status { font-size: 11px; font-weight: 600; margin-top: 7px; }
+  .t-red    { color: #ff7a70; }
+  .t-green  { color: #74d68d; }
+  .t-orange { color: #f3a851; }
+
+  /* ---------- Acciones (en fila, debajo del render) ---------- */
+  .actions { display: flex; gap: 12px; margin-bottom: 4px; }
+  .actions .btn { flex: 1; }
+
+  .bar { height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .26); overflow: hidden; }
   .bar > i {
     display: block; height: 100%; border-radius: 4px;
     width: 0%; transition: width .5s ease, background .3s;
@@ -176,8 +188,6 @@
   .c-orange { background: var(--orange); }
 
   /* action buttons */
-  .actions { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
-
   .btn {
     border: none; border-radius: 12px;
     padding: 15px 16px; font-size: 15px; font-weight: 600;
@@ -185,10 +195,10 @@
   }
 
   .btn-primary {
-    background: var(--red); color: #fff;
-    box-shadow: 0 6px 16px rgba(224, 71, 61, .35);
+    background: var(--green-pill); color: #fff;
+    box-shadow: 0 6px 16px rgba(46, 139, 87, .35);
   }
-  .btn-primary:hover { background: var(--red-dark); }
+  .btn-primary:hover { background: var(--green-dark); }
   .btn-primary:disabled { opacity: .55; cursor: default; box-shadow: none; }
 
   .btn-outline {
@@ -282,38 +292,35 @@
       </div>
       <div class="subtitle">Pothos · maceta #1 <span class="edit-icon">✎</span></div>
 
-      <!-- Render placeholder with cactus background -->
+      <!-- Render con las stats superpuestas a la derecha -->
       <div class="render">
         <span>RENDER AQUI</span>
-      </div>
-
-      <!-- Stats + actions -->
-      <div class="panel">
         <div class="stats">
           <div class="stat">
-            <div class="label">humedad</div>
-            <div class="glyph">💧</div>
-            <div class="value"><span id="humVal">--</span>%</div>
-            <div class="bar"><i id="humBar" class="c-red"></i></div>
+            <div class="label">tanque</div>
+            <div class="value"><span id="tankVal">--</span>%</div>
+            <div class="bar"><i id="tankBar" class="c-orange"></i></div>
+            <div id="tankStatus" class="status t-orange">--</div>
           </div>
           <div class="stat">
             <div class="label">luz</div>
-            <div class="glyph">☀️</div>
             <div class="value"><span id="luxVal">--</span><small> lux</small></div>
             <div class="bar"><i id="luxBar" class="c-green"></i></div>
+            <div id="luxStatus" class="status t-green">--</div>
           </div>
           <div class="stat">
-            <div class="label">tanque</div>
-            <div class="glyph">🪣</div>
-            <div class="value"><span id="tankVal">--</span>%</div>
-            <div class="bar"><i id="tankBar" class="c-orange"></i></div>
+            <div class="label">humedad</div>
+            <div class="value"><span id="humVal">--</span>%</div>
+            <div class="bar"><i id="humBar" class="c-red"></i></div>
+            <div id="humStatus" class="status t-red">--</div>
           </div>
         </div>
+      </div>
 
-        <div class="actions">
-          <button id="btnRegar" class="btn btn-primary">Regar planta ahora</button>
-          <button id="btnUmbrales" class="btn btn-outline">Ajustar umbrales</button>
-        </div>
+      <!-- Acciones debajo del render -->
+      <div class="actions">
+        <button id="btnRegar" class="btn btn-primary">Regar planta ahora</button>
+        <button id="btnUmbrales" class="btn btn-outline">Ajustar umbrales</button>
       </div>
 
       <!-- Estado actual -->
@@ -371,6 +378,11 @@
     barEl.className = "c-" + color;
   }
 
+  function setStatus(el, text, color) {
+    el.textContent = text ?? "--";
+    el.className = "status t-" + color;
+  }
+
   function fmtTimer(totalSeconds) {
     if (totalSeconds == null) return "--:--:--";
     const h = Math.floor(totalSeconds / 3600);
@@ -392,12 +404,15 @@
     // Métricas
     $("humVal").textContent  = state.humedad.value ?? "--";
     setBar($("humBar"), state.humedad.bar, state.humedad.color);
+    setStatus($("humStatus"), state.humedad.status, state.humedad.color);
 
     $("luxVal").textContent  = state.luz.value ?? "--";
     setBar($("luxBar"), state.luz.bar, state.luz.color);
+    setStatus($("luxStatus"), state.luz.status, state.luz.color);
 
     $("tankVal").textContent = state.tanque.value ?? "--";
     setBar($("tankBar"), state.tanque.bar, state.tanque.color);
+    setStatus($("tankStatus"), state.tanque.status, state.tanque.color);
 
     // Estado actual
     $("estadoAlert").textContent = state.estado.alert;
