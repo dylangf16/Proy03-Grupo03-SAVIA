@@ -4,7 +4,8 @@
 #include "Adafruit_VEML7700.h"
 
 // Implementacion base para Arduino UNO R4 WiFi:
-// Lee humedad en A0 y activa bomba/relay en D2 mientras la humedad este baja.
+// Lee humedad en A0 y riega por pulsos en D2: echa un chorro corto, apaga,
+// deja absorber, vuelve a medir y repite hasta alcanzar la humedad objetivo.
 // Ademas se conecta por WiFi y envia la telemetria de los sensores y el estado
 // del motor por HTTP POST al servidor (telemetry_receiver.py).
 
@@ -56,6 +57,20 @@ const int WATER_VALUE = 900;
 // Histeresis para evitar encendido/apagado rapido.
 const float MOISTURE_LOW_THRESHOLD = 35.0f;
 const float MOISTURE_HIGH_THRESHOLD = 45.0f;
+
+// Riego por pulsos: en vez de dejar la bomba encendida hasta que suba la
+// humedad, se echa un chorro corto, se apaga para que el agua se absorba,
+// se vuelve a medir y se repite hasta alcanzar MOISTURE_HIGH_THRESHOLD.
+const unsigned long MOTOR_PULSE_ON_MS = 3000;   // duracion de cada chorro
+const unsigned long MOTOR_SOAK_MS = 8000;       // espera para absorber y re-medir
+
+enum IrrigationState {
+  IRRIG_IDLE,   // suelo ok / inactivo
+  IRRIG_PULSE,  // bomba ON echando agua
+  IRRIG_SOAK    // bomba OFF, dejando absorber antes de re-medir
+};
+IrrigationState irrigState = IRRIG_IDLE;
+unsigned long irrigPhaseStartMs = 0;
 
 // Rangos solicitados para nivel de agua medido por distancia.
 // FULL  : distancia <= 5 cm  (agua cerca del sensor, tanque lleno)
@@ -110,16 +125,53 @@ void setMotor(bool on) {
   digitalWrite(MOTOR_PIN, on ? MOTOR_ACTIVE_LEVEL : MOTOR_INACTIVE_LEVEL);
 }
 
-void evaluateIrrigation(float moisturePct) {
+// Control de riego por pulsos (no bloqueante, basado en millis()):
+//   IDLE  -> si el suelo esta seco, arranca un chorro y pasa a PULSE.
+//   PULSE -> bomba ON durante MOTOR_PULSE_ON_MS (o corta antes si ya
+//            alcanzo la humedad objetivo), luego apaga y pasa a SOAK.
+//   SOAK  -> bomba OFF durante MOTOR_SOAK_MS para que el agua se absorba;
+//            al terminar re-mide: si sigue seco da otro pulso, si no, IDLE.
+void updateIrrigation(float moisturePct, unsigned long now) {
+  // Lectura invalida del sensor: apaga la bomba y reinicia el ciclo.
   if (moisturePct < 0.0f) {
     setMotor(false);
+    irrigState = IRRIG_IDLE;
     return;
   }
 
-  if (!motorOn && moisturePct <= MOISTURE_LOW_THRESHOLD) {
-    setMotor(true);
-  } else if (motorOn && moisturePct >= MOISTURE_HIGH_THRESHOLD) {
-    setMotor(false);
+  switch (irrigState) {
+    case IRRIG_IDLE:
+      if (moisturePct <= MOISTURE_LOW_THRESHOLD) {
+        setMotor(true);
+        irrigState = IRRIG_PULSE;
+        irrigPhaseStartMs = now;
+      }
+      break;
+
+    case IRRIG_PULSE:
+      if (moisturePct >= MOISTURE_HIGH_THRESHOLD) {
+        // Ya se alcanzo el objetivo: corta de inmediato.
+        setMotor(false);
+        irrigState = IRRIG_IDLE;
+      } else if (now - irrigPhaseStartMs >= MOTOR_PULSE_ON_MS) {
+        // Fin del chorro: apaga y deja absorber.
+        setMotor(false);
+        irrigState = IRRIG_SOAK;
+        irrigPhaseStartMs = now;
+      }
+      break;
+
+    case IRRIG_SOAK:
+      if (now - irrigPhaseStartMs >= MOTOR_SOAK_MS) {
+        if (moisturePct >= MOISTURE_HIGH_THRESHOLD) {
+          irrigState = IRRIG_IDLE;       // objetivo alcanzado
+        } else {
+          setMotor(true);                // sigue seco: otro pulso
+          irrigState = IRRIG_PULSE;
+          irrigPhaseStartMs = now;
+        }
+      }
+      break;
   }
 }
 
@@ -390,7 +442,7 @@ void loop() {
 
   int soilRaw = readSoilRaw();
   float moisturePct = rawToMoisturePct(soilRaw);
-  evaluateIrrigation(moisturePct);
+  updateIrrigation(moisturePct, now);
 
   float distanceCm = readDistanceFilteredCm();
   WaterLevel level = classifyWaterLevel(distanceCm);
