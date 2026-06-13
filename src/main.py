@@ -40,6 +40,7 @@ MACETA_HTML_FILE = REPO_ROOT / "interfaz_web/mimaceta.html"
 HOME_CSS_FILE = REPO_ROOT / "interfaz_web/savia-home.css"
 MACETA_CSS_FILE = REPO_ROOT / "interfaz_web/mimaceta.css"
 IMAGE_FILE = REPO_ROOT / "interfaz_web/imagen_cactus_bonito.jpeg"
+IMAGES_DIR = REPO_ROOT / "interfaz_web/imagenes"
 
 # Mapeo de distancia (cm) -> porcentaje de tanque (limites de calibracion).
 TANK_PCT_FULL_CM = 4.0    # <= 4 cm  => 100 %
@@ -276,6 +277,8 @@ class SaviaHandler(BaseHTTPRequestHandler):
             self._send_file(HOME_CSS_FILE, "text/css; charset=utf-8")
         elif self.path == "/mimaceta.css":
             self._send_file(MACETA_CSS_FILE, "text/css; charset=utf-8")
+        elif self.path.startswith("/imagenes/"):
+            self._send_image_from_dir(self.path)
         elif self.path == "/imagen_cactus_bonito.jpeg":
             self._send_file(IMAGE_FILE, "image/jpeg")
         elif self.path == "/api/state":
@@ -336,6 +339,25 @@ class SaviaHandler(BaseHTTPRequestHandler):
             self._send(404, b"File not found", "text/plain")
             return
         self._send(200, data, content_type)
+
+    def _send_image_from_dir(self, request_path: str):
+        rel = request_path.removeprefix("/imagenes/")
+        candidate = (IMAGES_DIR / rel).resolve()
+        images_root = IMAGES_DIR.resolve()
+        if images_root not in candidate.parents and candidate != images_root:
+            self._send(403, b"Forbidden", "text/plain")
+            return
+
+        suffix = candidate.suffix.lower()
+        content_type = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+        }.get(suffix, "application/octet-stream")
+
+        self._send_file(candidate, content_type)
 
     def _send_json(self, obj):
         self._send(200, json.dumps(obj).encode("utf-8"), "application/json")
