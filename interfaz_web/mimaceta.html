@@ -31,13 +31,16 @@
     <!-- Main card -->
     <section class="card">
       <div class="title-row">
-        <h1 class="title">mi savia</h1>
-        <span class="edit-icon">✎</span>
+        <h1 id="titleText" class="title">mi suculentosa</h1>
+        <button class="edit-icon edit-btn" data-edit-target="titleText" data-edit-label="nombre de la maceta" type="button" aria-label="Editar nombre de la maceta">✎</button>
         <div id="conn" class="conn offline">
           <span class="led"></span><span id="connText">Sin conexión</span>
         </div>
       </div>
-      <div class="subtitle">Suculenta · maceta #1 <span class="edit-icon">✎</span></div>
+      <div class="subtitle">
+        <span id="subtitleText">Suculenta · maceta #1</span>
+        <button class="edit-icon edit-btn" data-edit-target="subtitleText" data-edit-label="descripcion de la maceta" type="button" aria-label="Editar descripcion de la maceta">✎</button>
+      </div>
 
       <!-- Render con las stats superpuestas a la derecha -->
       <div class="render">
@@ -207,6 +210,42 @@
     setTimeout(() => t.classList.remove("show"), 2600);
   }
 
+  function loadEditableText() {
+    const titleSaved = sessionStorage.getItem("mimaceta.titleText");
+    const subtitleSaved = sessionStorage.getItem("mimaceta.subtitleText");
+
+    if (titleSaved) {
+      $("titleText").textContent = titleSaved;
+    }
+    if (subtitleSaved) {
+      $("subtitleText").textContent = subtitleSaved;
+    }
+  }
+
+  function bindEditableText() {
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.dataset.editTarget;
+        const label = btn.dataset.editLabel || "texto";
+        const target = $(targetId);
+        if (!target) return;
+
+        const next = window.prompt(`Editar ${label}:`, target.textContent.trim());
+        if (next == null) return;
+
+        const clean = next.trim();
+        if (!clean) {
+          toast("El texto no puede quedar vacio");
+          return;
+        }
+
+        target.textContent = clean;
+        sessionStorage.setItem(`mimaceta.${targetId}`, clean);
+        toast("Texto actualizado para esta sesion");
+      });
+    });
+  }
+
   // Regar ahora
   $("btnRegar").addEventListener("click", async () => {
     try {
@@ -247,6 +286,8 @@
   });
 
   // Arranque
+  loadEditableText();
+  bindEditableText();
   poll();
   setInterval(poll, 2000);
 </script>

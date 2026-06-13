@@ -47,8 +47,8 @@ body {
   color: #fff;
   background-image: url("/imagenes/circulos.png");
   background-position: center center;
-  background-repeat: repeat-x;
-  background-size: auto 100%;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .logo {
@@ -158,6 +158,13 @@ h1.title {
   color: var(--muted);
   font-size: 15px;
   cursor: pointer;
+}
+
+.edit-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
 }
 
 .subtitle {
