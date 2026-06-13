@@ -1,0 +1,504 @@
+:root {
+  --page-bg: #aaaaaa;
+  --surface: #f7f7f7;
+  --hero-dark: rgba(3, 27, 15, 0.66);
+  --ink: #121212;
+  --muted: #565656;
+  --pill-border: rgba(255, 255, 255, 0.5);
+  --white-soft: rgba(255, 255, 255, 0.88);
+  --green: #cfe5cf;
+  --green-strong: #2d9f3c;
+  --danger: #c14646;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  padding: 48px 32px;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.18);
+}
+
+.hero-wrap {
+  position: relative;
+  min-height: 670px;
+  padding: 30px 34px 20px;
+  color: white;
+  background: url("/imagen_cactus_bonito.jpeg") center 44% / cover no-repeat;
+}
+
+.hero-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(1, 18, 12, 0.82) 10%, rgba(4, 44, 26, 0.64) 40%, rgba(3, 20, 13, 0.62) 100%);
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  z-index: 1;
+}
+
+.topbar,
+.hero-content,
+.hero-bottom {
+  position: relative;
+  z-index: 2;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-pills {
+  display: flex;
+  gap: 10px;
+}
+
+.pill {
+  border: 1px solid var(--pill-border);
+  color: #f8f8f8;
+  text-decoration: none;
+  font-size: 15px;
+  padding: 10px 26px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.pill.active {
+  background: var(--white-soft);
+  color: #0f0f0f;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: transparent;
+  color: white;
+  position: relative;
+}
+
+.heart {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.icon-btn .dot {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5c5c;
+}
+
+.pill-light {
+  color: white;
+  font-weight: 500;
+}
+
+.hero-content {
+  margin-top: 88px;
+  max-width: 830px;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: "Sora", sans-serif;
+  font-size: clamp(30px, 5.8vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.hero-content h1 {
+  margin: 4px 0 0;
+  font-family: "Sora", sans-serif;
+  font-size: clamp(90px, 15vw, 220px);
+  text-transform: lowercase;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.hero-copy {
+  margin: 12px auto 0;
+  font-size: clamp(16px, 1.55vw, 22px);
+  max-width: 860px;
+}
+
+.hero-bottom {
+  margin-top: 120px;
+  display: flex;
+  align-items: end;
+  gap: 18px;
+}
+
+.hero-stat {
+  width: 260px;
+  border-radius: 24px;
+  padding: 22px 20px;
+  background: rgba(173, 188, 173, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+.hero-stat-main {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.hero-stat-sub {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.4;
+}
+
+.intro,
+.pots,
+.guides {
+  padding: 36px 34px;
+}
+
+.intro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+}
+
+.intro h2,
+.section-head h2 {
+  margin: 0;
+  font-family: "Sora", sans-serif;
+  font-size: clamp(56px, 7.2vw, 116px);
+  line-height: 0.95;
+  text-transform: lowercase;
+  letter-spacing: -0.04em;
+}
+
+.intro p {
+  margin: 14px 0 0;
+  color: #202020;
+  font-size: clamp(17px, 1.45vw, 25px);
+  max-width: 620px;
+}
+
+.intro-highlight {
+  margin-top: 0;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.section-head {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 26px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+
+.section-head p {
+  margin: 0;
+  color: #2c2c2c;
+  font-size: clamp(14px, 1.15vw, 19px);
+}
+
+.pot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pot-card {
+  border: 1px solid #ececec;
+  border-radius: 20px;
+  overflow: hidden;
+  background: white;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+
+.pot-card img {
+  grid-column: 1 / 3;
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+}
+
+.pot-info {
+  padding: 12px 16px 16px;
+}
+
+.pot-info h3 {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 500;
+}
+
+.pot-info p {
+  margin: 4px 0 6px;
+  font-size: 16px;
+  color: #666;
+}
+
+.status {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.status.on {
+  color: #1d8f32;
+}
+
+.status.off {
+  color: #9a9a9a;
+}
+
+.arrow {
+  margin: auto 14px 14px auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #101010;
+  color: white;
+  border: none;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.arrow:disabled {
+  background: #c4c4c4;
+  color: #efefef;
+}
+
+.dots {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d8d8d8;
+}
+
+.dots .dot.active {
+  width: 46px;
+  border-radius: 999px;
+  background: #2b7a3f;
+}
+
+.section-head.center {
+  grid-template-columns: 1fr;
+  text-align: center;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.guide-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  grid-template-rows: repeat(2, 265px);
+  gap: 14px;
+}
+
+.guide-card {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  color: white;
+}
+
+.guide-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.9) contrast(1.08);
+}
+
+.guide-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.12));
+}
+
+.guide-card h3,
+.floating-panel,
+.guide-arrow {
+  position: absolute;
+  z-index: 1;
+}
+
+.guide-card h3 {
+  margin: 0;
+  left: 18px;
+  bottom: 16px;
+  font-size: clamp(30px, 3vw, 56px);
+  font-family: "Sora", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.guide-card.wide {
+  grid-column: 1;
+}
+
+.guide-card.tall {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.floating-panel {
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  background: rgba(198, 198, 198, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.floating-panel h3 {
+  position: static;
+  font-size: clamp(34px, 4vw, 58px);
+}
+
+.floating-panel p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.guide-arrow {
+  top: 10px;
+  right: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0f0f0f;
+  font-size: 26px;
+}
+
+.guide-arrow:disabled {
+  opacity: 0.62;
+}
+
+@media (max-width: 1100px) {
+  body {
+    padding: 16px;
+  }
+
+  .page {
+    border-radius: 20px;
+  }
+
+  .hero-wrap {
+    min-height: 500px;
+    padding: 20px;
+  }
+
+  .hero-content {
+    margin-top: 48px;
+  }
+
+  .hero-bottom {
+    margin-top: 60px;
+    justify-content: flex-start;
+  }
+
+  .intro,
+  .section-head {
+    grid-template-columns: 1fr;
+  }
+
+  .pot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    gap: 12px;
+  }
+
+  .guide-card,
+  .guide-card.wide,
+  .guide-card.tall {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-pills {
+    width: 100%;
+    overflow: auto;
+    padding-bottom: 4px;
+  }
+
+  .pill {
+    white-space: nowrap;
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  .hero-stat {
+    width: 100%;
+  }
+
+  .pot-info h3 {
+    font-size: 30px;
+  }
+}

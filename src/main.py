@@ -17,7 +17,9 @@ El Arduino debe seguir enviando su POST a  http://<ip-del-pc>:5000/telemetry
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
+import os
 import socket
 import threading
 import time
@@ -33,7 +35,10 @@ DEFAULT_PORT = 5000
 
 # main.py vive en src/, los assets web estan en la raiz del repositorio.
 REPO_ROOT = Path(__file__).resolve().parent.parent
-HTML_FILE = REPO_ROOT / "interfaz_web/mimaceta.html"
+HOME_HTML_FILE = REPO_ROOT / "interfaz_web/index.html"
+MACETA_HTML_FILE = REPO_ROOT / "interfaz_web/mimaceta.html"
+HOME_CSS_FILE = REPO_ROOT / "interfaz_web/savia-home.css"
+MACETA_CSS_FILE = REPO_ROOT / "interfaz_web/mimaceta.css"
 IMAGE_FILE = REPO_ROOT / "interfaz_web/imagen_cactus_bonito.jpeg"
 
 # Mapeo de distancia (cm) -> porcentaje de tanque (limites de calibracion).
@@ -50,6 +55,11 @@ LUX_FULL_REF = 1000.0
 # Se considera "sin conexion" si no llega telemetria en este tiempo.
 STALE_AFTER_S = 10.0
 
+# Reenvio opcional de umbrales al Arduino (si expone un endpoint HTTP).
+ARDUINO_THRESHOLD_PATH = os.getenv("ARDUINO_THRESHOLD_PATH", "/thresholds")
+ARDUINO_THRESHOLD_PORT = int(os.getenv("ARDUINO_THRESHOLD_PORT", "80"))
+ARDUINO_THRESHOLD_TIMEOUT_S = 1.5
+
 # Intervalo de riego automatico mostrado en el contador (segundos).
 AUTO_IRRIGATION_INTERVAL_S = 2 * 3600 + 5 * 60 + 38  # 2 h 5 min 38 s
 
@@ -64,6 +74,7 @@ class SaviaState:
         self._lock = threading.Lock()
         self.last_payload: dict | None = None
         self.last_update_ts: float | None = None
+        self.last_device_ip: str | None = None
         self.last_irrigation_ts: float = time.time()
 
         # Umbrales ajustables desde la UI ("Ajustar umbrales").
@@ -72,10 +83,12 @@ class SaviaState:
         self.luz_min = 200.0
         self.luz_max = 10000.0
 
-    def update_telemetry(self, payload: dict) -> None:
+    def update_telemetry(self, payload: dict, device_ip: str | None = None) -> None:
         with self._lock:
             self.last_payload = payload
             self.last_update_ts = time.time()
+            if device_ip:
+                self.last_device_ip = device_ip
 
     def set_thresholds(self, data: dict) -> None:
         with self._lock:
@@ -90,6 +103,10 @@ class SaviaState:
     def snapshot(self) -> dict:
         with self._lock:
             return self._build_state()
+
+    def get_last_device_ip(self) -> str | None:
+        with self._lock:
+            return self.last_device_ip
 
     # -- calculo del estado que consume la interfaz -------------------------- #
     def _build_state(self) -> dict:
@@ -251,8 +268,14 @@ class SaviaHandler(BaseHTTPRequestHandler):
 
     # -- GET ---------------------------------------------------------------- #
     def do_GET(self):
-        if self.path in ("/", "/index.html", "/mimaceta.html"):
-            self._send_file(HTML_FILE, "text/html; charset=utf-8")
+        if self.path in ("/", "/index.html"):
+            self._send_file(HOME_HTML_FILE, "text/html; charset=utf-8")
+        elif self.path == "/mimaceta.html":
+            self._send_file(MACETA_HTML_FILE, "text/html; charset=utf-8")
+        elif self.path == "/savia-home.css":
+            self._send_file(HOME_CSS_FILE, "text/css; charset=utf-8")
+        elif self.path == "/mimaceta.css":
+            self._send_file(MACETA_CSS_FILE, "text/css; charset=utf-8")
         elif self.path == "/imagen_cactus_bonito.jpeg":
             self._send_file(IMAGE_FILE, "image/jpeg")
         elif self.path == "/api/state":
@@ -266,7 +289,7 @@ class SaviaHandler(BaseHTTPRequestHandler):
             payload = self._read_json()
             if payload is None:
                 return
-            STATE.update_telemetry(payload)
+            STATE.update_telemetry(payload, device_ip=self.client_address[0])
             self._log_telemetry(payload)
             self._send_json({"status": "ok"})
         elif self.path == "/api/irrigate":
@@ -279,7 +302,12 @@ class SaviaHandler(BaseHTTPRequestHandler):
                 return
             STATE.set_thresholds(payload)
             print(f"[{_now()}] Umbrales actualizados: {payload}")
-            self._send_json({"status": "ok", "thresholds": STATE.snapshot()["thresholds"]})
+            forward = _forward_thresholds_to_arduino(payload, STATE.get_last_device_ip())
+            self._send_json({
+                "status": "ok",
+                "thresholds": STATE.snapshot()["thresholds"],
+                "arduino_forward": forward,
+            })
         else:
             self._send(404, b"Not Found", "text/plain")
 
@@ -323,6 +351,61 @@ class SaviaHandler(BaseHTTPRequestHandler):
 
 def _now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _forward_thresholds_to_arduino(thresholds: dict, discovered_ip: str | None) -> dict:
+    """Intenta reenviar umbrales al Arduino por HTTP si hay un destino valido."""
+    target_host = os.getenv("ARDUINO_HOST") or discovered_ip
+    if not target_host:
+        return {
+            "sent": False,
+            "reason": "no_target",
+            "path": ARDUINO_THRESHOLD_PATH,
+            "port": ARDUINO_THRESHOLD_PORT,
+        }
+
+    body = json.dumps(thresholds)
+    conn = http.client.HTTPConnection(
+        host=target_host,
+        port=ARDUINO_THRESHOLD_PORT,
+        timeout=ARDUINO_THRESHOLD_TIMEOUT_S,
+    )
+    try:
+        conn.request(
+            "POST",
+            ARDUINO_THRESHOLD_PATH,
+            body=body,
+            headers={"Content-Type": "application/json"},
+        )
+        res = conn.getresponse()
+        status = int(res.status)
+        sent = 200 <= status < 300
+        print(
+            f"[{_now()}] Reenvio de umbrales a Arduino -> "
+            f"{target_host}:{ARDUINO_THRESHOLD_PORT}{ARDUINO_THRESHOLD_PATH} "
+            f"status={status}"
+        )
+        return {
+            "sent": sent,
+            "status": status,
+            "host": target_host,
+            "port": ARDUINO_THRESHOLD_PORT,
+            "path": ARDUINO_THRESHOLD_PATH,
+        }
+    except OSError as exc:
+        print(
+            f"[{_now()}] No se pudo reenviar umbrales a Arduino "
+            f"({target_host}:{ARDUINO_THRESHOLD_PORT}{ARDUINO_THRESHOLD_PATH}): {exc}"
+        )
+        return {
+            "sent": False,
+            "reason": str(exc),
+            "host": target_host,
+            "port": ARDUINO_THRESHOLD_PORT,
+            "path": ARDUINO_THRESHOLD_PATH,
+        }
+    finally:
+        conn.close()
 
 
 def _local_ip() -> str:

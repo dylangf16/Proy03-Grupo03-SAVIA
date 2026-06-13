@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVIA | Inicio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Sora:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/savia-home.css" />
+</head>
+<body>
+  <main class="page" id="inicio">
+    <section class="hero-wrap" aria-label="Portada principal">
+      <div class="hero-overlay"></div>
+
+      <header class="topbar">
+        <nav class="nav-pills" aria-label="Navegacion principal">
+          <a class="pill active" href="#inicio">Inicio</a>
+          <a class="pill" href="#tus-macetas">Tus macetas</a>
+          <a class="pill" href="#" aria-disabled="true">Blog</a>
+        </nav>
+
+        <div class="top-actions">
+          <button class="icon-btn" type="button" aria-label="Favoritos">
+            <span class="heart">♡</span>
+            <span class="dot" aria-hidden="true"></span>
+          </button>
+          <button class="pill pill-light" type="button">Iniciar sesion</button>
+        </div>
+      </header>
+
+      <div class="hero-content">
+        <p class="eyebrow">Maceta inteligente</p>
+        <h1>savia</h1>
+        <p class="hero-copy">SAVIA monitorea el suelo, la luz y el agua en tiempo real y te avisa justo cuando tu planta lo necesita.</p>
+      </div>
+
+      <div class="hero-bottom">
+        <article class="hero-stat">
+          <p class="hero-stat-main">20+ plantas<br />3 sensores</p>
+          <p class="hero-stat-sub">Humedad · Luz ambiental<br />Nivel de tanque</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="intro" id="intro">
+      <article>
+        <h2>Plantas para<br />las personas</h2>
+        <p>La mayoria de las plantas mueren por cuido incorrecto, no por falta de amor. SAVIA lee las condiciones reales de tu planta y actua antes de que sea tarde.</p>
+      </article>
+      <article>
+        <p class="intro-highlight">Cuando el suelo esta seco, la bomba riega. Cuando falta luz, te avisamos. Cuando el tanque se vacia, te lo recordamos. Vos solo disfrutas de tus plantas y su compania.</p>
+      </article>
+    </section>
+
+    <section class="pots" id="tus-macetas">
+      <div class="section-head">
+        <h2>Tus macetas</h2>
+        <p>El estado actual de cada planta que tenes registrada. Sensores en tiempo real para entender su ambiente de un vistazo.</p>
+      </div>
+
+      <div class="pot-grid">
+        <article class="pot-card">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Maceta de pothos" />
+          <div class="pot-info">
+            <h3>Pothos</h3>
+            <p>Humedad 38% · suelo seco · necesita agua hoy</p>
+            <span class="status off">Sin alertas</span>
+          </div>
+          <button class="arrow" type="button" aria-label="Abrir Pothos" disabled>→</button>
+        </article>
+
+        <article class="pot-card">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Maceta de suculenta" />
+          <div class="pot-info">
+            <h3>Suculenta</h3>
+            <p>Humedad 67% · luz adecuada · todo en orden</p>
+            <span class="status on">Regar ahora</span>
+          </div>
+          <a class="arrow" href="/mimaceta.html" aria-label="Abrir Suculenta">→</a>
+        </article>
+      </div>
+
+      <div class="dots" aria-hidden="true">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+    </section>
+
+    <section class="guides" id="guias">
+      <div class="section-head center">
+        <h2>Guías de cuidado</h2>
+        <p>Busca tu planta y conoce como regarla, cuanta luz necesita y que parametros configurar en SAVIA.</p>
+      </div>
+
+      <div class="guide-grid">
+        <article class="guide-card wide with-panel">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Guia de Philodendron" />
+          <div class="floating-panel">
+            <h3>Philodendron</h3>
+            <p>Sustrato aireado, riego moderado y luz brillante indirecta para hojas sanas.</p>
+          </div>
+          <button class="guide-arrow" type="button" aria-label="Abrir guia de Philodendron" disabled>→</button>
+        </article>
+
+        <article class="guide-card tall">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Guia de Calathea" />
+          <h3>Calathea</h3>
+          <button class="guide-arrow" type="button" aria-label="Abrir guia de Calathea" disabled>→</button>
+        </article>
+
+        <article class="guide-card">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Guia de Monstera" />
+          <h3>Monstera</h3>
+          <button class="guide-arrow" type="button" aria-label="Abrir guia de Monstera" disabled>→</button>
+        </article>
+
+        <article class="guide-card wide">
+          <img src="/imagen_cactus_bonito.jpeg" alt="Guia de Pothos" />
+          <h3>Pothos</h3>
+          <button class="guide-arrow" type="button" aria-label="Abrir guia de Pothos" disabled>→</button>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
